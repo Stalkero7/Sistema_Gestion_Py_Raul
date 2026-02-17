@@ -1,0 +1,16 @@
+{
+    "inventario": {
+        "1": {
+            "nombre": "Kilo",
+            "precio": 213123.0,
+            "categoria": "Alimentos",
+            "oferta": false
+        }
+    },
+    "categorias": [
+        "Electr\u00f3nica",
+        "Alimentos",
+        "Hogar",
+        "Otros"
+    ]
+}
