@@ -1,14 +1,14 @@
 {
     "inventario": {
         "1": {
-            "nombre": "Kilo",
-            "precio": 213123.0,
+            "nombre": "Platano",
+            "precio": 3000.0,
             "categoria": "Alimentos",
             "oferta": false
         }
     },
     "categorias": [
-        "Electr\u00f3nica",
+        "Electrónica",
         "Alimentos",
         "Hogar",
         "Otros"

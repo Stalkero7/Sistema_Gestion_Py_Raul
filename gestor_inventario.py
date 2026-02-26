@@ -1,96 +1,92 @@
 """
 Módulo de lógica para la gestión de productos.
-Versión: 0.9 - Con Persistencia de Datos (JSON)
+Versión: 1.1 - Estable
 """
+import json
+import os
 import re
 import csv
-import json # Nueva librería para la persistencia de datos
-import os   # Para verificar si el archivo existe antes de cargarlo
 
+# Lista de categorías que persiste en el JSON
 CATEGORIAS = ["Electrónica", "Alimentos", "Hogar", "Otros"]
 ARCHIVO_DATOS = "inventario.json"
 
-def guardar_datos(inventario):
-    """Guarda el inventario y las categorías en un archivo JSON."""
-    datos = {
-        "inventario": inventario,
-        "categorias": CATEGORIAS
-    }
-    try:
-        with open(ARCHIVO_DATOS, "w", encoding="utf-8") as f:
-            json.dump(datos, f, indent=4)
-        return True
-    except Exception as e:
-        print(f"Error al guardar: {e}")
-        return False
-
-def cargar_datos():
-    """Carga el inventario y las categorías desde el archivo JSON."""
-    global CATEGORIAS
-    if os.path.exists(ARCHIVO_DATOS):
-        try:
-            with open(ARCHIVO_DATOS, "r", encoding="utf-8") as f:
-                datos = json.load(f)
-                CATEGORIAS = datos.get("categorias", CATEGORIAS)
-                return datos.get("inventario", {})
-        except Exception as e:
-            print(f"Error al cargar datos: {e}")
-            return {}
-    return {}
-
 def validar_nombre(nombre):
-    """Failsafe: Permite solo letras, números y espacios."""
-    if not re.match("^[a-zA-Z0-9 ]*$", nombre):
+    """Valida que el nombre sea alfanumérico y no esté vacío."""
+    if not nombre or not re.match("^[a-zA-Z0-9 ]*$", nombre):
+        return False
+    # Enforce a sensible maximum length to avoid excessively long names
+    if len(nombre.strip()) > 100:
         return False
     return len(nombre.strip()) > 0
 
+def cargar_datos():
+    """Carga inventario y categorías desde JSON."""
+    global CATEGORIAS
+    if not os.path.exists(ARCHIVO_DATOS):
+        return {}
+    try:
+        with open(ARCHIVO_DATOS, "r", encoding="utf-8") as f:
+            datos = json.load(f)
+            CATEGORIAS = datos.get("categorias", CATEGORIAS)
+            return datos.get("inventario", {})
+    except:
+        return {}
+
+def guardar_datos(inventario):
+    """Guarda el estado actual del sistema (Productos y Categorías)."""
+    try:
+        datos = {"inventario": inventario, "categorias": CATEGORIAS}
+        with open(ARCHIVO_DATOS, "w", encoding="utf-8") as f:
+            json.dump(datos, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error al guardar: {e}")
+
 def agregar_producto(inventario, nombre, precio, categoria, en_oferta):
-    """Genera un ID único y guarda el producto."""
-    if not inventario:
-        nuevo_id = "1"
-    else:
-        nuevo_id = str(max(int(k) for k in inventario.keys()) + 1)
-        
+    """Genera ID y registra el producto."""
+    # Generación de ID basada en el máximo actual
+    ids_numericos = [int(k) for k in inventario.keys()]
+    nuevo_id = str(max(ids_numericos + [0]) + 1)
+    
     inventario[nuevo_id] = {
         "nombre": nombre,
-        "precio": precio, 
+        "precio": precio,
         "categoria": categoria,
         "oferta": en_oferta
     }
-    guardar_datos(inventario) # Guardado automático
+    guardar_datos(inventario)
     return inventario, nuevo_id
 
-def eliminar_por_codigo(inventario, codigo):
-    """Elimina por ID y actualiza el archivo."""
-    if codigo in inventario:
-        nombre = inventario[codigo]["nombre"]
-        del inventario[codigo]
-        guardar_datos(inventario) # Guardado automático
+def obtener_listado_por_categoria(inventario, categoria_filtro):
+    """Retorna una lista de strings con ID y Nombre de productos filtrados."""
+    resultados = []
+    for id_prod, info in inventario.items():
+        if info["categoria"] == categoria_filtro:
+            oferta_tag = " [OFERTA]" if info["oferta"] else ""
+            resultados.append(f"ID: {id_prod} | {info['nombre']}{oferta_tag} - ${info['precio']:.2f}")
+    return resultados
+
+def eliminar_por_id(inventario, id_prod):
+    """Elimina producto y actualiza archivo."""
+    if id_prod in inventario:
+        nombre = inventario[id_prod]["nombre"]
+        del inventario[id_prod]
+        guardar_datos(inventario)
         return True, nombre
     return False, None
 
-def obtener_inventario_por_categoria(inventario, categoria_filtro):
-    lineas = []
-    for cod, info in inventario.items():
-        if info["categoria"] == categoria_filtro:
-            tag = " [OFERTA]" if info["oferta"] else ""
-            lineas.append(f"ID: {cod} | {info['nombre']}{tag} - ${info['precio']:.2f}")
-    
-    if not lineas:
-        return f"No hay productos registrados en {categoria_filtro}."
-    return "\n".join(lineas)
-
-def exportar_a_csv(inventario, nombre_archivo="reporte_inventario.csv"):
+def exportar_csv(inventario):
+    """Crea el archivo Excel/CSV con delimitador de punto y coma."""
     if not inventario:
-        return False, "El inventario está vacío."
+        return False, "Inventario vacío"
+    nombre_archivo = "reporte_inventario.csv"
     try:
-        with open(nombre_archivo, mode='w', newline='', encoding='utf-8') as archivo:
-            escritor = csv.writer(archivo, delimiter=';')
-            escritor.writerow(['ID', 'Categoría', 'Producto', 'Precio', '¿En Oferta?'])
-            productos_ordenados = sorted(inventario.items(), key=lambda x: x[1]['categoria'])
-            for cod, info in productos_ordenados:
-                oferta_texto = "SÍ" if info['oferta'] else "NO"
-                escritor.writerow([cod, info['categoria'], info['nombre'], f"{info['precio']:.2f}", oferta_texto])
+        with open(nombre_archivo, mode='w', newline='', encoding='utf-8') as f:
+            escritor = csv.writer(f, delimiter=';')
+            escritor.writerow(['ID', 'CATEGORIA', 'PRODUCTO', 'PRECIO', 'OFERTA'])
+            for k, v in inventario.items():
+                oferta = "SI" if v['oferta'] else "NO"
+                escritor.writerow([k, v['categoria'], v['nombre'], v['precio'], oferta])
         return True, nombre_archivo
-    except Exception as e:
-        return False, str(e)
+    except:
+        return False, "Error de escritura en disco"
